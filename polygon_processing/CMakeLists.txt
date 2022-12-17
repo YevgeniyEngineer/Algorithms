@@ -26,5 +26,3 @@ target_link_libraries(${PROJECT_NAME}
     Python3::Module
     Python3::NumPy
 )
-
-# target_link_libraries(${PROJECT_NAME} ${PYTHON_LIBRARIES})

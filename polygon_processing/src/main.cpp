@@ -9,6 +9,7 @@
 #include <iostream>
 #include <mutex>
 #include <random>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -27,7 +28,7 @@ std::mutex mutex;
 
 int main()
 {
-    int NUMBER_OF_POINTS = 100;
+    int NUMBER_OF_POINTS = 100000;
 
     using namespace polygon_processing;
 
@@ -44,6 +45,7 @@ int main()
         polygon_processing::point_t point;
         point.x = x;
         point.y = y;
+        point.index = i;
 
         x_values.push_back(x);
         y_values.push_back(y);
@@ -55,32 +57,90 @@ int main()
 
     // ----- Construct Convex Hull ------
     auto t1 = std::chrono::high_resolution_clock::now();
+
     ConvexHull convex_hull(points);
-    auto convex_polygon = convex_hull.getResultAsArray(number_of_hull_points);
+    auto convex_points = convex_hull.getResultAsArray(number_of_hull_points);
+
     auto t2 = std::chrono::high_resolution_clock::now();
-    // ----------------------------------
 
     std::cout << "Constructed convex hull of size " << number_of_hull_points << " from " << points.size() << " points"
               << std::endl;
     std::cout << "Time elapsed constructing convex hull: " << std::chrono::duration<double>(t2 - t1).count()
               << " seconds" << std::endl;
+    // ----------------------------------
 
-    std::vector<float> hull_x_values;
-    hull_x_values.resize(number_of_hull_points);
-    std::vector<float> hull_y_values;
-    hull_y_values.resize(number_of_hull_points);
-    for (int i = 0; i < convex_polygon.size(); ++i)
+    // ----- Construct Concave Hull ------
+    t1 = std::chrono::high_resolution_clock::now();
+
+    // Convert points to appropriate format
+    std::vector<std::array<float, 2>> points_;
+    points_.reserve(points.size());
+    for (const auto &point : points)
     {
-        hull_x_values[i] = convex_polygon[i].x;
-        hull_y_values[i] = convex_polygon[i].y;
+        points_.push_back({point.x, point.y});
     }
+
+    // Convert convex hull indices to appropriate format
+    std::vector<int> convex_hull_indices_;
+    convex_hull_indices_.reserve(number_of_hull_points);
+    for (const auto &point : convex_points)
+    {
+        convex_hull_indices_.push_back(point.index);
+    }
+
+    // Construct concave hull
+    auto concave_points = concaveman<float, 16>(points_, convex_hull_indices_, 2);
+
+    t2 = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Constructed concave hull of size " << concave_points.size() << " from " << points.size() << " points"
+              << std::endl;
+    std::cout << "Time elapsed constructing concave hull: " << std::chrono::duration<double>(t2 - t1).count()
+              << " seconds" << std::endl;
+    // ----------------------------------
 
     const std::lock_guard<std::mutex> lock(mutex);
 
-    plt::figure_size(1200, 780);
-    plt::plot(x_values, y_values, ".");
-    plt::plot(hull_x_values, hull_y_values, "r-");
-    plt::show();
+    std::vector<float> convex_hull_x_values;
+    convex_hull_x_values.resize(convex_points.size());
+    std::vector<float> convex_hull_y_values;
+    convex_hull_y_values.resize(convex_points.size());
+    for (int i = 0; i < convex_points.size(); ++i)
+    {
+        convex_hull_x_values[i] = convex_points[i].x;
+        convex_hull_y_values[i] = convex_points[i].y;
+    }
+
+    std::vector<float> concave_hull_x_values;
+    concave_hull_x_values.resize(concave_points.size());
+    std::vector<float> concave_hull_y_values;
+    concave_hull_y_values.resize(concave_points.size());
+    for (int i = 0; i < concave_points.size(); ++i)
+    {
+        concave_hull_x_values[i] = concave_points[i][0];
+        concave_hull_y_values[i] = concave_points[i][1];
+    }
+
+    try
+    {
+        plt::figure_size(1200, 780);
+        plt::plot(x_values, y_values, ".");
+        plt::named_plot("convex hull", convex_hull_x_values, convex_hull_y_values, "r-");
+        plt::named_plot("concave hull", concave_hull_x_values, concave_hull_y_values, "g-");
+        plt::legend();
+        plt::title("Polygon simplification");
+        plt::show();
+    }
+    catch (const std::exception &ex)
+    {
+        std::cerr << "Exception: " << ex.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+    catch (...)
+    {
+        std::cerr << "Unknown exception!" << std::endl;
+        return EXIT_FAILURE;
+    }
 
     return EXIT_SUCCESS;
 }
