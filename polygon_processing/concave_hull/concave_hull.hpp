@@ -683,7 +683,8 @@ std::array<T, 2> findCandidate(const RTree<T, 2, MAX_CHILDREN, std::array<T, 2>>
             auto bounds = child->bounds();
             point_type pt = {bounds[0], bounds[1]};
 
-            auto dist = child->is_leaf() ? squarePointToSegmentDistance(pt, b, c) : sqSegBoxDist(b, c, *child);
+            auto dist = child->is_leaf() ? squarePointToSegmentDistance(pt, b, c)
+                                         : squareSegmentToBoundingBoxDistance(b, c, *child);
             if (dist > maxDist)
             {
                 continue; // skip the node if it's farther than we ever need
@@ -692,7 +693,7 @@ std::array<T, 2> findCandidate(const RTree<T, 2, MAX_CHILDREN, std::array<T, 2>>
             queue.push(tuple_type(-dist, *child));
         }
 
-        while (!queue.empty() && std::get<1>(queue.top()).get().is_leaf())
+        while ((!queue.empty()) && (std::get<1>(queue.top()).get().is_leaf()))
         {
             auto item = queue.top();
             queue.pop();
@@ -710,7 +711,7 @@ std::array<T, 2> findCandidate(const RTree<T, 2, MAX_CHILDREN, std::array<T, 2>>
             {
 
                 ok = true;
-                return std::get<1>(item).get().data();
+                return (std::get<1>(item).get().data());
             }
         }
 
@@ -728,7 +729,8 @@ std::array<T, 2> findCandidate(const RTree<T, 2, MAX_CHILDREN, std::array<T, 2>>
 
 // square distance from a segment bounding box to the given one
 template <class T, int MAX_CHILDREN, class USER_DATA>
-T sqSegBoxDist(const std::array<T, 2> &a, const std::array<T, 2> &b, const RTree<T, 2, MAX_CHILDREN, USER_DATA> &bbox)
+T squareSegmentToBoundingBoxDistance(const std::array<T, 2> &a, const std::array<T, 2> &b,
+                                     const RTree<T, 2, MAX_CHILDREN, USER_DATA> &bbox)
 {
 
     if (inside(a, bbox) || inside(b, bbox))
