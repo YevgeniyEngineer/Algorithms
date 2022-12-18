@@ -28,7 +28,7 @@ std::mutex mutex;
 
 int main()
 {
-    int NUMBER_OF_POINTS = 100000;
+    int NUMBER_OF_POINTS = 5000;
 
     using namespace polygon_processing;
 

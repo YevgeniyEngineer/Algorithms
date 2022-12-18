@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.18)
 
+# Compillation instructions
+# cd build
+# cmake -DCMAKE_BUILD_TYPE=Release ..
+# make 
+
 project(polygon_processing)
 
 include_directories(
