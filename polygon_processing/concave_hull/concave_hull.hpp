@@ -523,7 +523,7 @@ template <class T> void updateBBox(typename CircularElement<T>::ptr_type elem)
 }
 
 template <class T, int MAX_CHILDREN>
-std::vector<std::array<T, 2>> concaveman(
+std::vector<std::array<T, 2>> Concaveman(
     const std::vector<std::array<T, 2>> &points,
     // start with a convex hull of the points
     const std::vector<int> &hull,

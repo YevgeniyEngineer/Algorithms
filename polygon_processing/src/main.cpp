@@ -28,7 +28,7 @@ std::mutex mutex;
 
 int main()
 {
-    int NUMBER_OF_POINTS = 5000;
+    int NUMBER_OF_POINTS = 1000000;
 
     using namespace polygon_processing;
 
@@ -89,7 +89,7 @@ int main()
     }
 
     // Construct concave hull
-    auto concave_points = concaveman<float, 16>(points_, convex_hull_indices_, 2);
+    auto concave_points = Concaveman<float, 16>(points_, convex_hull_indices_, 2.0);
 
     t2 = std::chrono::high_resolution_clock::now();
 
