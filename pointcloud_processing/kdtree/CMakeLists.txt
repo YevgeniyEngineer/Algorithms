@@ -17,3 +17,18 @@ include_directories(
 add_executable(${PROJECT_NAME} 
     main.cpp
 )
+
+find_package(GTest REQUIRED)
+
+enable_testing()
+
+add_executable(${PROJECT_NAME}_test
+    test.cpp
+)
+
+target_link_libraries(${PROJECT_NAME}_test
+    GTest::gtest_main
+)
+
+include(GoogleTest)
+gtest_discover_tests(${PROJECT_NAME}_test)
