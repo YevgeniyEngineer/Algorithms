@@ -24,23 +24,29 @@ template <typename T, std::size_t dim> class KDTree
     // KDtree(const KDTree &) = delete;
     // KDTree &operator=(const KDTree &) = delete;
 
-    template <typename Iterator> KDTree(Iterator begin, Iterator end) : nodes_(begin, end)
+    template <typename Iterator> KDTree(Iterator begin, Iterator end, bool threaded = true) : nodes_(begin, end)
     {
-#if THREADED
-        root_ = buildTreeParallel(0UL, nodes_.size(), 0UL, 0U);
-#else
-        root_ = buildTree(0UL, nodes_.size(), 0UL);
-#endif
+        if (threaded)
+        {
+            root_ = buildTreeParallel(0UL, nodes_.size(), 0UL, 0U);
+        }
+        else
+        {
+            root_ = buildTree(0UL, nodes_.size(), 0UL);
+        }
     }
 
     template <typename Iterable, typename IterableType = typename Iterable::value_type>
-    KDTree(Iterable values) : nodes_(values.begin(), values.end())
+    KDTree(Iterable values, bool threaded = true) : nodes_(values.begin(), values.end())
     {
-#if THREADED
-        root_ = buildTreeParallel(0UL, nodes_.size(), 0UL, 0U);
-#else
-        root_ = buildTree(0UL, nodes_.size(), 0UL);
-#endif
+        if (threaded)
+        {
+            root_ = buildTreeParallel(0UL, nodes_.size(), 0UL, 0U);
+        }
+        else
+        {
+            root_ = buildTree(0UL, nodes_.size(), 0UL);
+        }
     }
 
     ~KDTree()
