@@ -73,7 +73,12 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "variant": "cpp",
-        "future": "cpp"
+        "future": "cpp",
+        "any": "cpp",
+        "coroutine": "cpp",
+        "hash_map": "cpp",
+        "hash_set": "cpp",
+        "valarray": "cpp"
     },
     "cmake.configureOnOpen": false
 }
