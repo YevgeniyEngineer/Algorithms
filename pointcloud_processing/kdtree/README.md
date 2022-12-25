@@ -1,8 +1,8 @@
 # KDTree
 
-KD-Tree with multithreading
+Balanced KD-Tree with multithreading
 
-## Benchmarks:
+## Benchmarks for 3D KD-Tree:
 
 | Number of Points | KD-Tree Construction (Sequential) | KD-Tree Construction (Parallel) | KD-Tree Query |
 |------------------|-----------------------------------|---------------------------------|---------------|
