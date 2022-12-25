@@ -11,10 +11,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED true)
 project(kdtree)
 
 include_directories(
-    ${PROJECT_SOURCE_DIR}/kdtree
+    ${PROJECT_SOURCE_DIR}/kdtree.hpp
 )
 
 add_executable(${PROJECT_NAME} 
     main.cpp
-    kdtree.cpp
 )

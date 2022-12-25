@@ -1,38 +1,42 @@
 #include "kdtree.hpp"
 
+#include <chrono>
+#include <random>
+
 int main()
 {
-    // Create a list of points
-    std::vector<Point<int>> points = {Point(2, 3, 1), Point(5, 4, 5), Point(9, 6, 3),
-                                      Point(4, 4, 7), Point(8, 2, 1), Point(7, 5, 2)};
+    constexpr std::size_t NUM_PTS = 20UL;
+    constexpr std::size_t NUM_DIM = 3UL;
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<double> dist(-10.0, 10.0);
+
+    std::vector<point_t<double, NUM_DIM>> points(NUM_PTS);
+    for (std::size_t i = 0UL; i < NUM_PTS; ++i)
+    {
+        points.push_back({dist(gen), dist(gen), dist(gen)});
+    }
 
     // Build the KD-Tree
-    KDTree kdtree(points);
+    auto t1 = std::chrono::high_resolution_clock::now();
+    auto kdtree = KDTree<double, NUM_DIM>(points);
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::cout << "Time elapsed for construction of kdtree: "
+              << std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1.0e9 << std::endl;
 
-    // // Search for the nearest neighbor of a given point
-    // Point target = Point({3, 4, 1});
-    // Point nearest = nearestNeighbor(root, target);
-    // std::cout << "Nearest neighbor: (";
-    // for (int i = 0; i < nearest.coordinates.size() - 1; i++)
-    // {
-    //     std::cout << nearest.coordinates[i] << " ";
-    // }
-    // std::cout << *(nearest.coordinates.end() - 1) << ")" << std::endl;
+    kdtree.printTree();
 
-    // std::cout << "Distances: " << std::endl;
-    // for (int i = 0; i < points.size(); ++i)
-    // {
-    //     auto point = points[i];
-    //     auto dx = point.coordinates[0] - target.coordinates[0];
-    //     auto dy = point.coordinates[1] - target.coordinates[1];
-    //     auto dz = point.coordinates[2] - target.coordinates[2];
-    //     auto dist = std::sqrt(dx * dx + dy * dy + dz * dz);
-    //     std::cout << "(" << point.coordinates[0] << " " << point.coordinates[1] << " " << point.coordinates[2] << ")"
-    //               << " ----> "
-    //               << "(" << target.coordinates[0] << " " << target.coordinates[1] << " " << target.coordinates[2] <<
-    //               ")"
-    //               << " = " << dist << std::endl;
-    // }
+    point_t<double, NUM_DIM> closest_point;
+    double closest_distance;
+    point_t<double, NUM_DIM> point_of_interest = {0.5, 0.3, 0.2};
 
-    return 0;
+    // Search closest point
+    auto t3 = std::chrono::high_resolution_clock::now();
+    closest_point = kdtree.nearest(point_of_interest);
+    auto t4 = std::chrono::high_resolution_clock::now();
+    std::cout << "Time elapsed for nearest neighbour search: "
+              << std::chrono::duration_cast<std::chrono::nanoseconds>(t4 - t3).count() / 1.0e9 << std::endl;
+
+    return EXIT_SUCCESS;
 }

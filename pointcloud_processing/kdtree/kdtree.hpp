@@ -1,183 +1,209 @@
 #ifndef KDTREE_HPP_
 #define KDTREE_HPP_
 
+#define THREADED 1
+
 #include <algorithm>
 #include <cmath>
+#include <future>
+#include <iomanip>
 #include <iostream>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
-// Define a point in 3-Dimensional space
-template <typename T> class Point
+static std::uint8_t DEFAULT_RECURSION_DEPTH =
+    static_cast<std::uint8_t>(floor(log2(std::thread::hardware_concurrency())));
+
+template <typename T, std::size_t dim> using point_t = std::array<T, dim>;
+template <typename T, std::size_t dim> class KDTree
 {
+    using point_t = std::array<T, dim>;
+
   public:
-    explicit Point(const T &x, const T &y, const T &z) : x_(x), y_(y), z_(z){};
-    virtual ~Point() = default;
+    // KDtree(const KDTree &) = delete;
+    // KDTree &operator=(const KDTree &) = delete;
 
-    // Getter methods
-    const T &x() const
+    template <typename Iterator> KDTree(Iterator begin, Iterator end) : nodes_(begin, end)
     {
-        return x_;
+#if THREADED
+        root_ = buildTreeParallel(0UL, nodes_.size(), 0UL, 0U);
+#else
+        root_ = buildTree(0UL, nodes_.size(), 0UL);
+#endif
     }
 
-    const T &y() const
+    template <typename Iterable, typename IterableType = typename Iterable::value_type>
+    KDTree(Iterable values) : nodes_(values.begin(), values.end())
     {
-        return y_;
+#if THREADED
+        root_ = buildTreeParallel(0UL, nodes_.size(), 0UL, 0U);
+#else
+        root_ = buildTree(0UL, nodes_.size(), 0UL);
+#endif
     }
 
-    const T &z() const
+    ~KDTree()
     {
-        return z_;
+        root_ = nullptr;
+        best_ = nullptr;
     }
 
-  private:
-    T x_;
-    T y_;
-    T z_;
-};
-
-// Distance between two points
-template <typename T> double distanceSquared(const Point<T> &point_1, const Point<T> &point_2)
-{
-    auto dx = point_1.x() - point_2.x();
-    auto dy = point_1.y() - point_2.y();
-    auto dz = point_1.z() - point_2.z();
-    return static_cast<double>((dx * dx) + (dy * dy) + (dz * dz));
-}
-
-// KDTreeNode
-template <typename T> class KDTreeNode
-{
-  public:
-    explicit KDTreeNode<T>(const Point<T> &point) : point_(point), left_(nullptr), right_(nullptr){};
-    virtual ~KDTreeNode<T>()
+    point_t nearest(const point_t &point)
     {
-        // std::cout << "Setting KDTreeNode left and right branches to nullptr" << std::endl;
-
-        left_ = nullptr;
-        right_ = nullptr;
-    };
-
-    // Getter methods
-    const KDTreeNode<T> *left() const
-    {
-        return left_;
-    }
-
-    const KDTreeNode<T> *right() const
-    {
-        return right_;
-    }
-
-    const Point<T> &point() const
-    {
-        return point_;
-    }
-
-    // Setter methods
-    void left(KDTreeNode<T> *left)
-    {
-        left_ = left;
-    }
-
-    KDTreeNode<T> *left()
-    {
-        return left_;
-    }
-
-    void right(KDTreeNode<T> *right)
-    {
-        right_ = right;
-    }
-
-    KDTreeNode<T> *right()
-    {
-        return right_;
-    }
-
-  private:
-    KDTreeNode<T> *left_;
-    KDTreeNode<T> *right_;
-    Point<T> point_;
-};
-
-// KDTree class
-template <typename T> class KDTree
-{
-  public:
-    KDTree(const std::vector<Point<T>> &points) : points_(points)
-    {
-        if (points.empty())
+        if (root_ == nullptr)
         {
-            throw std::runtime_error("At least one point should be provided to KDTree!");
+            throw std::logic_error("Tree is empty");
         }
+        best_ = nullptr;
+        visited_ = 0UL;
+        best_dist_ = 0.0;
+        nearest(root_, point, 0UL);
+        return best_->point_;
+    }
 
-        // Construct tree
-        root_ = buildTree(points_, 0);
-    };
-    ~KDTree() noexcept
+    void printTree()
     {
-        deleteTree(root_);
-    };
+        printTree("", root_, false);
+    }
 
   private:
-    KDTreeNode<T> *root_;
-    std::vector<Point<T>> points_;
-
-    // Constructs KDTree from a vector of points
-    KDTreeNode<T> *buildTree(std::vector<Point<T>> &points, std::size_t depth)
+    struct Node
     {
-        if (points.empty())
+        Node(const point_t &point) : point_(point), left_(nullptr), right_(nullptr)
+        {
+        }
+        ~Node()
+        {
+            left_ = nullptr;
+            right_ = nullptr;
+        }
+        point_t point_;
+        Node *left_ = nullptr;
+        Node *right_ = nullptr;
+    };
+
+    Node *root_ = nullptr;
+    Node *best_ = nullptr;
+
+    double best_dist_ = 0.0;
+    std::size_t visited_ = 0UL;
+    std::vector<Node> nodes_;
+
+    void printTree(const std::string &prefix, const Node *node, bool is_left)
+    {
+        if (node != nullptr)
+        {
+            std::cout << prefix;
+
+            std::cout << (is_left ? "├──" : "└──");
+
+            // print the value of the node
+            auto node_it = node->point_.begin();
+            std::cout << "(";
+            for (; node_it != node->point_.end() - 1; ++node_it)
+            {
+                std::cout << std::setprecision(2) << *node_it << " ";
+            }
+            std::cout << std::setprecision(2) << *(node_it) << ")" << std::endl;
+
+            // enter the next tree level - left and right branch
+            printTree(prefix + (is_left ? "│   " : "    "), node->left_, true);
+            printTree(prefix + (is_left ? "│   " : "    "), node->right_, false);
+        }
+    }
+
+    Node *buildTree(std::size_t begin, std::size_t end, std::size_t index)
+    {
+        if (end <= begin)
         {
             return nullptr;
         }
 
-        std::size_t axis = depth % 3;
-        // Rearranges the elements in the range [first,last), in such a way that the element at the nth position is the
-        // element that would be in that position in a sorted sequence.
-        switch (axis)
-        {
-        case 0:
-            std::nth_element(points.begin(), points.end() + points.size() / 2, points.end(),
-                             [&](const Point<T> &pt_1, const Point<T> &pt_2) -> bool { return pt_1.x() < pt_2.x(); });
-            break;
-        case 1:
-            std::nth_element(points.begin(), points.end() + points.size() / 2, points.end(),
-                             [&](const Point<T> &pt_1, const Point<T> &pt_2) -> bool { return pt_1.y() < pt_2.y(); });
-            break;
-        case 2:
-            std::nth_element(points.begin(), points.end() + points.size() / 2, points.end(),
-                             [&](const Point<T> &pt_1, const Point<T> &pt_2) -> bool { return pt_1.z() < pt_2.z(); });
-            break;
-        }
+        std::size_t middle = begin + (end - begin) / 2;
+        auto nodes_it = nodes_.begin();
+        std::nth_element(
+            nodes_it + begin, nodes_it + middle, nodes_it + end,
+            [&index](const Node &pt_1, const Node &pt_2) -> bool { return pt_1.point_[index] < pt_2.point_[index]; });
 
-        KDTreeNode<T> *node = new KDTreeNode<T>(points[points.size() / 2]);
-        std::vector<Point<T>> left_points(points.begin(), points.begin() + points.size() / 2);
-        std::vector<Point<T>> right_points(points.begin() + points.size() / 2 + 1, points.end());
+        index = (index + 1) % dim;
+        nodes_[middle].left_ = this->buildTree(begin, middle, index);
+        nodes_[middle].right_ = this->buildTree(middle + 1, end, index);
 
-        node->left(buildTree(left_points, depth + 1));
-        node->right(buildTree(right_points, depth + 1));
-
-        return node;
+        return &nodes_[middle];
     }
 
-    // Performs a depth-first traversal of the tree and deletes each node. The tree is traversed recursively, first
-    // deleting the left subtree, then the right subtree, and finally the node itself. This ensures that all nodes in
-    // the tree are properly deleted.
-    void deleteTree(KDTreeNode<T> *node)
+    Node *buildTreeParallel(std::size_t begin, std::size_t end, std::size_t index, std::uint8_t recursion_depth = 0U)
     {
-        if (node == nullptr)
+        // sequential
+        if (recursion_depth > DEFAULT_RECURSION_DEPTH)
+        {
+            buildTree(begin, end, index);
+        }
+        // parallel
+        {
+            if (end <= begin)
+            {
+                return nullptr;
+            }
+
+            std::size_t middle = begin + (end - begin) / 2;
+            auto nodes_it = nodes_.begin();
+            std::nth_element(nodes_it + begin, nodes_it + middle, nodes_it + end,
+                             [&index](const Node &pt_1, const Node &pt_2) -> bool {
+                                 return pt_1.point_[index] < pt_2.point_[index];
+                             });
+
+            index = (index + 1) % dim;
+
+            std::future<Node *> future = std::async(std::launch::async, [&]() {
+                return this->buildTreeParallel(begin, middle, index, recursion_depth + 1);
+            });
+
+            nodes_[middle].right_ = this->buildTree(middle + 1, end, index);
+            nodes_[middle].left_ = future.get();
+
+            return &nodes_[middle];
+        }
+    }
+
+    double distanceSquared(const point_t &pt_1, const point_t &pt_2) const
+    {
+        double dist = 0.0;
+        for (std::size_t i = 0; i < dim; ++i)
+        {
+            double delta = pt_1[i] - pt_2[i];
+            dist += delta * delta;
+        }
+        return dist;
+    }
+
+    void nearest(Node *root, const point_t &point, std::size_t index)
+    {
+        if (root == nullptr)
         {
             return;
         }
+        ++visited_;
 
-        deleteTree(node->left());
-        // std::cout << "Deleted left node" << std::endl;
-
-        deleteTree(node->right());
-        // std::cout << "Deleted right node" << std::endl;
-
-        delete node;
+        double dist = distanceSquared(root->point_, point);
+        if ((best_ == nullptr) || (dist < best_dist_))
+        {
+            best_dist_ = dist;
+            best_ = root;
+        }
+        if (best_dist_ == 0.0)
+        {
+            return;
+        }
+        double delta = root->point_[index] - point[index];
+        index = (index + 1) % dim;
+        nearest((delta > 0.0) ? root->left_ : root->right_, point, index);
+        if (delta * delta >= best_dist_)
+        {
+            return;
+        }
+        nearest((delta > 0.0) ? root->right_ : root->left_, point, index);
     }
 };
 
