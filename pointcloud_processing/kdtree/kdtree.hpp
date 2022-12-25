@@ -138,9 +138,10 @@ template <typename T, std::size_t dim> class KDTree
         // sequential
         if (recursion_depth > DEFAULT_RECURSION_DEPTH)
         {
-            buildTree(begin, end, index);
+            return buildTree(begin, end, index);
         }
         // parallel
+        else
         {
             if (end <= begin)
             {
@@ -160,7 +161,7 @@ template <typename T, std::size_t dim> class KDTree
                 return this->buildTreeParallel(begin, middle, index, recursion_depth + 1);
             });
 
-            nodes_[middle].right_ = this->buildTree(middle + 1, end, index);
+            nodes_[middle].right_ = this->buildTreeParallel(middle + 1, end, index, recursion_depth + 1);
             nodes_[middle].left_ = future.get();
 
             return &nodes_[middle];

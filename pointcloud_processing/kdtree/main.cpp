@@ -5,7 +5,7 @@
 
 int main()
 {
-    constexpr std::size_t NUM_PTS = 20UL;
+    constexpr std::size_t NUM_PTS = 1000000UL;
     constexpr std::size_t NUM_DIM = 3UL;
 
     std::random_device rd;
@@ -25,7 +25,7 @@ int main()
     std::cout << "Time elapsed for construction of kdtree: "
               << std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1.0e9 << std::endl;
 
-    kdtree.printTree();
+    // kdtree.printTree();
 
     point_t<double, NUM_DIM> closest_point;
     double closest_distance;
