@@ -6,7 +6,7 @@
 
 int main()
 {
-    constexpr std::size_t NUM_PTS = 100'000;
+    constexpr std::size_t NUM_PTS = 10'000'000; // 100'000;
 
     constexpr std::size_t NUM_DIM = 3UL;
 
