@@ -11,14 +11,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED true)
 project(kdtree)
 
 include_directories(
-    ${PROJECT_SOURCE_DIR}/kdtree.hpp
+    ${PROJECT_SOURCE_DIR}
 )
 
-add_executable(${PROJECT_NAME} 
+add_executable(${PROJECT_NAME}
     main.cpp
 )
 
 find_package(GTest REQUIRED)
+find_package(TBB REQUIRED)
 
 enable_testing()
 
@@ -26,8 +27,13 @@ add_executable(${PROJECT_NAME}_test
     test.cpp
 )
 
+target_link_libraries(${PROJECT_NAME}
+    TBB::tbb
+)
+
 target_link_libraries(${PROJECT_NAME}_test
     GTest::gtest_main
+    TBB::tbb
 )
 
 include(GoogleTest)

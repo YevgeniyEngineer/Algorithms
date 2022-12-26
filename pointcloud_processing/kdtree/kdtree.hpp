@@ -5,19 +5,23 @@
 
 #include <algorithm>
 #include <cmath>
+#include <execution>
 #include <future>
 #include <iomanip>
 #include <iostream>
+#include <numeric>
 #include <stdexcept>
 #include <thread>
+#include <utility>
 #include <vector>
 
 static std::uint8_t DEFAULT_RECURSION_DEPTH =
-    static_cast<std::uint8_t>(floor(log2(std::thread::hardware_concurrency())));
+    static_cast<std::uint8_t>(std::floor(std::log2(std::thread::hardware_concurrency())));
 
 template <typename T, std::size_t dim> using point_t = std::array<T, dim>;
 template <typename T, std::size_t dim> class KDTree
 {
+  protected:
     using point_t = std::array<T, dim>;
 
   public:
@@ -52,7 +56,7 @@ template <typename T, std::size_t dim> class KDTree
     ~KDTree()
     {
         root_ = nullptr;
-        best_ = nullptr;
+        visited_ = 0UL;
     }
 
     point_t nearest(const point_t &point)
@@ -61,16 +65,46 @@ template <typename T, std::size_t dim> class KDTree
         {
             throw std::logic_error("Tree is empty");
         }
-        best_ = nullptr;
-        visited_ = 0UL;
-        best_dist_ = 0.0;
-        nearest(root_, point, 0UL);
-        return best_->point_;
+
+        Node *best = nullptr;
+        double best_dist = std::numeric_limits<double>::max();
+        this->nearestSearch(root_, point, 0UL, std::ref(best), std::ref(best_dist));
+
+        point_t closest_neighbour = best->point_;
+        best = nullptr;
+
+        return closest_neighbour;
+    }
+
+    void nearest(const std::vector<point_t> &points, std::vector<point_t> &neighbours, std::uint8_t thread_num = 4U)
+    {
+        if (root_ == nullptr)
+        {
+            throw std::logic_error("Tree is empty");
+        }
+        const auto &number_of_points = points.size();
+
+        neighbours.clear();
+        neighbours.resize(number_of_points);
+
+        std::vector<std::size_t> indices;
+        indices.resize(number_of_points);
+        std::iota(indices.begin(), indices.end(), 0UL);
+
+        std::for_each(std::execution::par, indices.begin(), indices.end(), [&](const std::size_t &i) -> void {
+            Node *best = nullptr;
+            double best_dist = std::numeric_limits<double>::max();
+
+            this->nearestSearch(root_, points[i], 0UL, std::ref(best), std::ref(best_dist));
+
+            neighbours[i] = best->point_;
+            best = nullptr;
+        });
     }
 
     void printTree()
     {
-        printTree("", root_, false);
+        this->printTree("", root_, false);
     }
 
   private:
@@ -90,9 +124,6 @@ template <typename T, std::size_t dim> class KDTree
     };
 
     Node *root_ = nullptr;
-    Node *best_ = nullptr;
-
-    double best_dist_ = 0.0;
     std::size_t visited_ = 0UL;
     std::vector<Node> nodes_;
 
@@ -114,8 +145,8 @@ template <typename T, std::size_t dim> class KDTree
             std::cout << std::setprecision(2) << *(node_it) << ")" << std::endl;
 
             // enter the next tree level - left and right branch
-            printTree(prefix + (is_left ? "│   " : "    "), node->left_, true);
-            printTree(prefix + (is_left ? "│   " : "    "), node->right_, false);
+            this->printTree(prefix + (is_left ? "│   " : "    "), node->left_, true);
+            this->printTree(prefix + (is_left ? "│   " : "    "), node->right_, false);
         }
     }
 
@@ -185,33 +216,36 @@ template <typename T, std::size_t dim> class KDTree
         return dist;
     }
 
-    void nearest(Node *root, const point_t &point, std::size_t index)
+    void nearestSearch(Node *root, const point_t &point, std::size_t index, Node *&best, double &best_dist)
     {
         if (root == nullptr)
         {
             return;
         }
-        ++visited_;
 
-        double dist = distanceSquared(root->point_, point);
-        if ((best_ == nullptr) || (dist < best_dist_))
+        double dist = this->distanceSquared(root->point_, point);
+        if ((best == nullptr) || (dist < best_dist))
         {
-            best_dist_ = dist;
-            best_ = root;
+            best_dist = dist;
+            best = root;
         }
-        if (best_dist_ == 0.0)
+
+        if (best_dist == 0.0)
         {
             return;
         }
+
         double delta = root->point_[index] - point[index];
         index = (index + 1) % dim;
-        nearest((delta > 0.0) ? root->left_ : root->right_, point, index);
-        if (delta * delta >= best_dist_)
+        this->nearestSearch((delta > 0.0) ? root->left_ : root->right_, point, index, best, best_dist);
+
+        if (delta * delta >= best_dist)
         {
             return;
         }
-        nearest((delta > 0.0) ? root->right_ : root->left_, point, index);
-    }
+
+        this->nearestSearch((delta > 0.0) ? root->right_ : root->left_, point, index, best, best_dist);
+    };
 };
 
 #endif // KDTREE_HPP_
