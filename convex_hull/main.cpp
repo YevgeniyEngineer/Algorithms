@@ -11,7 +11,7 @@ namespace plt = matplotlibcpp;
 int main()
 {
     // Generate random points
-    constexpr std::size_t number_of_points = 100'000;
+    constexpr std::size_t number_of_points = 10000'000;
 
     std::mt19937 rng;
     std::uniform_real_distribution<double> dist(-10.0, 10.0);

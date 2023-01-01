@@ -6,6 +6,7 @@
 #include <cmath>
 #include <deque>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <tuple>
@@ -543,16 +544,10 @@ template <typename _PointType> class ConvexHull
     {
         std::size_t index_q1_start = 0;
         std::size_t index_q1_end = q1_count_ - 1;
+        std::size_t index_q2_start, index_q2_end;
+        std::size_t index_q3_start, index_q3_end;
+        std::size_t index_q4_start, index_q4_end;
         Point<_PointType> point_last = q1_pts_[index_q1_end];
-
-        std::size_t index_q2_start;
-        std::size_t index_q2_end;
-
-        std::size_t index_q3_start;
-        std::size_t index_q3_end;
-
-        std::size_t index_q4_start;
-        std::size_t index_q4_end;
 
         auto setPoints = [&point_last](const std::size_t count, std::size_t &idx_start, std::size_t &idx_end,
                                        const std::deque<Point<_PointType>> &points) -> void {
@@ -611,14 +606,25 @@ template <typename _PointType> class ConvexHull
 
         convex_hull_points_.reserve(count_of_final_hull_point);
 
-        std::copy(q1_pts_.begin() + index_q1_start, q1_pts_.begin() + index_q1_end + 1,
-                  std::back_inserter(convex_hull_points_));
-        std::copy(q2_pts_.begin() + index_q2_start, q2_pts_.begin() + index_q2_end + 1,
-                  std::back_inserter(convex_hull_points_));
-        std::copy(q3_pts_.begin() + index_q3_start, q3_pts_.begin() + index_q3_end + 1,
-                  std::back_inserter(convex_hull_points_));
-        std::copy(q4_pts_.begin() + index_q4_start, q4_pts_.begin() + index_q4_end + 1,
-                  std::back_inserter(convex_hull_points_));
+        for (std::size_t i = index_q1_start; i < index_q1_end + 1; ++i)
+        {
+            convex_hull_points_.emplace_back(std::move(q1_pts_[i]));
+        }
+
+        for (std::size_t i = index_q2_start; i < index_q2_end + 1; ++i)
+        {
+            convex_hull_points_.emplace_back(std::move(q2_pts_[i]));
+        }
+
+        for (std::size_t i = index_q3_start; i < index_q3_end + 1; ++i)
+        {
+            convex_hull_points_.emplace_back(std::move(q3_pts_[i]));
+        }
+
+        for (std::size_t i = index_q4_start; i < index_q4_end + 1; ++i)
+        {
+            convex_hull_points_.emplace_back(std::move(q4_pts_[i]));
+        }
 
         if (count_of_final_hull_point > 1 && should_close_the_graph_)
         {
