@@ -6,6 +6,8 @@
 #include <memory>
 #include <vector>
 
+/**** This is a basic implementation of QuadTree. It requires more work to be useable ****/
+
 // Structure to hold 2D cartesian point
 struct Point
 {
@@ -90,7 +92,7 @@ class QuadTree
     // Insert a point into the QuadTree
     bool insert(const Point &point)
     {
-        // Ignore the object that do not belong to this quad tree
+        // Ignore the object that does not belong to this quad tree
         if (!boundary_.containsPoint(point))
         {
             // Object cannot be added
