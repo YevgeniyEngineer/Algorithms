@@ -26,11 +26,20 @@ struct BoundingBox
 
     explicit BoundingBox(const Point &_center, float _half_width) : center(_center), half_width(_half_width)
     {
-        x_min = center.x - half_width;
-        x_max = center.x + half_width;
-        y_min = center.y - half_width;
-        y_max = center.y + half_width;
+        this->x_min = center.x - half_width;
+        this->x_max = center.x + half_width;
+        this->y_min = center.y - half_width;
+        this->y_max = center.y + half_width;
     };
+    explicit BoundingBox(const BoundingBox &rhs)
+    {
+        this->center = rhs.center;
+        this->half_width = rhs.half_width;
+        this->x_min = rhs.x_min;
+        this->x_max = rhs.x_max;
+        this->y_min = rhs.y_min;
+        this->y_max = rhs.y_max;
+    }
     ~BoundingBox() = default;
 
     bool containsPoint(const Point &point) const
@@ -43,7 +52,7 @@ struct BoundingBox
         {
             return false;
         }
-        return false;
+        return true;
     }
 
     bool intersectsBoundingBox(const BoundingBox &bbox) const
@@ -62,7 +71,7 @@ struct BoundingBox
 
 class QuadTree
 {
-    constexpr static const unsigned int QUADRANTS = 4;
+    constexpr static const unsigned int NODE_CAPACITY = 4;
 
   private:
     // Represents boundaries of this quad tree
@@ -79,7 +88,10 @@ class QuadTree
 
   public:
     explicit QuadTree(const BoundingBox &boundary)
-        : boundary_(boundary), north_west_(nullptr), north_east_(nullptr), south_west_(nullptr), south_east_(nullptr){};
+        : boundary_(boundary), north_west_(nullptr), north_east_(nullptr), south_west_(nullptr),
+          south_east_(nullptr){
+              // std::cout << "Created new quad" << std::endl;
+          };
     ~QuadTree()
     {
         north_west_.release();
@@ -102,7 +114,7 @@ class QuadTree
         // If there is space in quad tree and
         // If it does not have subdivisions,
         // add the object here
-        if (points_.size() < QUADRANTS && north_west_.get() == nullptr)
+        if (points_.size() < NODE_CAPACITY && north_west_.get() == nullptr)
         {
             points_.push_back(point);
             return true;
@@ -142,13 +154,12 @@ class QuadTree
     {
         // Divide boundaries of current node
         float half_width = boundary_.half_width / 2.0f;
-        float quarter_width = half_width / 2.0f;
 
         // Find center points in each quadrant
-        float x_west = boundary_.center.x - quarter_width;
-        float x_east = boundary_.center.x + quarter_width;
-        float y_south = boundary_.center.y - quarter_width;
-        float y_north = boundary_.center.y + quarter_width;
+        float x_west = boundary_.center.x - half_width;
+        float x_east = boundary_.center.x + half_width;
+        float y_south = boundary_.center.y - half_width;
+        float y_north = boundary_.center.y + half_width;
 
         // Assign center points to each quadrant
         Point north_west_center{x_west, y_north};
@@ -172,8 +183,11 @@ class QuadTree
     // Find all points contained within range
     void queryRange(const BoundingBox &range_boundary, std::vector<Point> &range_points)
     {
-        // Prepare an array of results
-        range_points.clear();
+        // Terminate here, if there are no children
+        if (north_west_.get() == nullptr)
+        {
+            return;
+        }
 
         // Automatically abort if the range does not intersect this quad
         if (!boundary_.intersectsBoundingBox(range_boundary))
@@ -181,6 +195,7 @@ class QuadTree
             // Points are not within bounding box boundary
             return;
         }
+
         // Check objects at this quad level
         for (const auto &point : points_)
         {
@@ -189,11 +204,7 @@ class QuadTree
                 range_points.push_back(point);
             }
         }
-        // Terminate here, if there are no children
-        if (north_west_ == nullptr)
-        {
-            return;
-        }
+
         // Otherwise, add the points from the children
         north_west_->queryRange(range_boundary, range_points);
         north_east_->queryRange(range_boundary, range_points);
