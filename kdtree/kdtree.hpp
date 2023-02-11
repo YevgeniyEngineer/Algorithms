@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <execution>
 #include <future>
 #include <iomanip>
@@ -25,10 +26,12 @@ template <typename T, std::size_t dim> class KDTree
     using point_t = std::array<T, dim>;
 
   public:
-    // KDtree(const KDTree &) = delete;
-    // KDTree &operator=(const KDTree &) = delete;
+    KDTree &operator=(const KDTree &rhs) = delete;
+    KDTree(const KDTree &other) = delete;
 
-    template <typename Iterator> KDTree(Iterator begin, Iterator end, bool threaded = true) : nodes_(begin, end)
+    explicit KDTree(const typename std::vector<point_t>::iterator &begin,
+                    const typename std::vector<point_t>::iterator &end, bool threaded = true)
+        : nodes_(begin, end), root_(nullptr)
     {
         if (threaded)
         {
@@ -40,8 +43,8 @@ template <typename T, std::size_t dim> class KDTree
         }
     }
 
-    template <typename Iterable, typename IterableType = typename Iterable::value_type>
-    KDTree(Iterable values, bool threaded = true) : nodes_(values.begin(), values.end())
+    explicit KDTree(const std::vector<point_t> &points, bool threaded = true)
+        : nodes_(points.begin(), points.end()), root_(nullptr)
     {
         if (threaded)
         {
@@ -102,6 +105,50 @@ template <typename T, std::size_t dim> class KDTree
         });
     }
 
+    void nearestNeighborsWithinRadius(const point_t &point, double search_radius, std::vector<point_t> &neighbors,
+                                      std::vector<double> &distances, bool return_sorted = true)
+    {
+        if (root_ == nullptr)
+        {
+            throw std::logic_error("Tree is empty");
+        }
+
+        neighbors.clear();
+        distances.clear();
+
+        recursiveNeighbourWithinRadiusSearch(root_, point, search_radius, 0UL, neighbors, distances);
+
+        if (return_sorted && !neighbors.empty())
+        {
+            std::vector<std::size_t> indices;
+
+            indices.reserve(neighbors.size());
+            for (std::size_t i = 0; i < neighbors.size(); ++i)
+            {
+                indices.emplace_back(i);
+            }
+
+            std::sort(indices.begin(), indices.end(), [&distances](const std::size_t &idx_1, const std::size_t &idx_2) {
+                return (distances[idx_1] < distances[idx_2]);
+            });
+
+            std::vector<point_t> neighbours_temp;
+            neighbours_temp.reserve(neighbors.size());
+
+            std::vector<double> distances_temp;
+            distances_temp.reserve(distances.size());
+
+            for (const std::size_t &index : indices)
+            {
+                neighbours_temp.emplace_back(std::move(neighbors[index]));
+                distances_temp.emplace_back(std::move(distances[index]));
+            }
+
+            neighbors = std::move(neighbours_temp);
+            distances = std::move(distances_temp);
+        }
+    }
+
     void printTree()
     {
         this->printTree("", root_, false);
@@ -110,14 +157,12 @@ template <typename T, std::size_t dim> class KDTree
   private:
     struct Node
     {
-        Node(const point_t &point) : point_(point), left_(nullptr), right_(nullptr)
-        {
-        }
+        explicit Node(const point_t &point) : point_(point), left_(nullptr), right_(nullptr){};
         ~Node()
         {
             left_ = nullptr;
             right_ = nullptr;
-        }
+        };
         point_t point_;
         Node *left_ = nullptr;
         Node *right_ = nullptr;
@@ -140,9 +185,9 @@ template <typename T, std::size_t dim> class KDTree
             std::cout << "(";
             for (; node_it != node->point_.end() - 1; ++node_it)
             {
-                std::cout << std::setprecision(2) << *node_it << " ";
+                std::cout << std::setprecision(2) << std::scientific << *node_it << " ";
             }
-            std::cout << std::setprecision(2) << *(node_it) << ")" << std::endl;
+            std::cout << std::setprecision(2) << std::scientific << *node_it << ")" << std::endl;
 
             // enter the next tree level - left and right branch
             this->printTree(prefix + (is_left ? "│   " : "    "), node->left_, true);
@@ -245,7 +290,42 @@ template <typename T, std::size_t dim> class KDTree
         }
 
         this->nearestSearch((delta > 0.0) ? root->right_ : root->left_, point, index, best, best_dist);
-    };
+    }
+
+    void recursiveNeighbourWithinRadiusSearch(Node *root, const point_t &point, double search_radius, std::size_t index,
+                                              std::vector<point_t> &neighbours, std::vector<double> &distances)
+    {
+        if (root == nullptr)
+        {
+            return;
+        }
+
+        double dist = this->distanceSquared(root->point_, point);
+
+        if (dist <= search_radius * search_radius && dist != 0.0)
+        {
+            neighbours.emplace_back(root->point_);
+            distances.emplace_back(dist);
+        }
+
+        bool left_subtree = (point[index] - search_radius < root->point_[index]);
+        bool right_subtree = (point[index] + search_radius > root->point_[index]);
+
+        index = (index + 1) % dim;
+
+        // If the distance between the target point and the split plane
+        // of the current node is less than the search radius,
+        // search both the left and right sub-trees.
+
+        if (left_subtree)
+        {
+            recursiveNeighbourWithinRadiusSearch(root->left_, point, search_radius, index, neighbours, distances);
+        }
+        if (right_subtree)
+        {
+            recursiveNeighbourWithinRadiusSearch(root->right_, point, search_radius, index, neighbours, distances);
+        }
+    }
 };
 
 #endif // KDTREE_HPP_

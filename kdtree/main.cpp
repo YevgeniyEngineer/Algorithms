@@ -1,12 +1,13 @@
 #include "kdtree.hpp"
 
 #include <chrono>
+#include <cstdio>
 #include <random>
 #include <thread>
 
 int main()
 {
-    constexpr std::size_t NUM_PTS = 10'000'000; // 100'000;
+    constexpr std::size_t NUM_PTS = 1000; // 10'000'000; // 100'000;
 
     constexpr std::size_t NUM_DIM = 3UL;
 
@@ -14,10 +15,16 @@ int main()
     std::mt19937 gen(rd());
     std::uniform_real_distribution<double> dist(-10.0, 10.0);
 
-    std::vector<point_t<double, NUM_DIM>> points(NUM_PTS);
+    std::vector<point_t<double, NUM_DIM>> points;
+    points.reserve(NUM_PTS);
     for (std::size_t i = 0UL; i < NUM_PTS; ++i)
     {
-        points.push_back({dist(gen), dist(gen), dist(gen)});
+        double x = dist(gen);
+        double y = dist(gen);
+        double z = dist(gen);
+
+        // std::printf("(%.3f, %.3f, %.3f)\n", x, y, z);
+        points.push_back({x, y, z});
     }
 
     try
@@ -26,7 +33,7 @@ int main()
         {
             // Build the KD-Tree
             auto t1 = std::chrono::high_resolution_clock::now();
-            auto kdtree = KDTree<double, NUM_DIM>(points);
+            KDTree<double, NUM_DIM> kdtree(points);
             auto t2 = std::chrono::high_resolution_clock::now();
             std::cout << "Time elapsed for construction of kdtree: "
                       << std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1.0e9 << std::endl;
@@ -51,7 +58,7 @@ int main()
         {
             // Build the KD-Tree
             auto t1 = std::chrono::high_resolution_clock::now();
-            auto kdtree = KDTree<double, NUM_DIM>(points, false);
+            KDTree<double, NUM_DIM> kdtree(points, false);
             auto t2 = std::chrono::high_resolution_clock::now();
             std::cout << "Time elapsed for construction of kdtree: "
                       << std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1.0e9 << std::endl;
@@ -76,7 +83,7 @@ int main()
         {
             // Build the KD-Tree
             auto t1 = std::chrono::high_resolution_clock::now();
-            auto kdtree = KDTree<double, NUM_DIM>(points);
+            KDTree<double, NUM_DIM> kdtree(points);
             auto t2 = std::chrono::high_resolution_clock::now();
             std::cout << "Time elapsed for construction of kdtree: "
                       << std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1.0e9 << std::endl;
@@ -99,7 +106,35 @@ int main()
             kdtree.nearest(points_of_interest, neighbour_points, number_of_threads);
             auto t4 = std::chrono::high_resolution_clock::now();
             std::cout << "Time elapsed for nearest neighbour search (many-to-many): "
+                      << std::chrono::duration_cast<std::chrono::nanoseconds>(t4 - t3).count() / 1.0e9 << std::endl
+                      << std::endl;
+        }
+        // Neighbours within radius
+        {
+            // Build the KD-Tree
+            KDTree<double, NUM_DIM> kdtree(points, true);
+            // kdtree.printTree();
+
+            point_t<double, NUM_DIM> point_of_interest{0.5, 0.3, 0.2};
+
+            std::vector<point_t<double, NUM_DIM>> neighbors;
+            std::vector<double> distances;
+
+            auto t3 = std::chrono::high_resolution_clock::now();
+            kdtree.nearestNeighborsWithinRadius(point_of_interest, 5.0, neighbors, distances, true);
+            auto t4 = std::chrono::high_resolution_clock::now();
+            std::cout << "Time elapsed for radius neighbour search (one-to-many): "
                       << std::chrono::duration_cast<std::chrono::nanoseconds>(t4 - t3).count() / 1.0e9 << std::endl;
+
+            // Print nearest neighbors within radius
+            for (std::size_t i = 0; i < neighbors.size(); ++i)
+            {
+                const auto &neighbor = neighbors[i];
+                const auto &distance = std::sqrt(distances[i]);
+                std::cout << "(" << point_of_interest[0] << ", " << point_of_interest[1] << ", " << point_of_interest[2]
+                          << ") ----> (" << neighbor[0] << ", " << neighbor[1] << ", " << neighbor[2] << ") is within "
+                          << distance << std::endl;
+            }
         }
     }
     catch (const std::exception &ex)
