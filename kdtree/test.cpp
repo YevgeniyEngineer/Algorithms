@@ -158,7 +158,7 @@ TEST(KDTreeTest, canFindAllElementsWithinRadius)
         // Find all points within specific radius
         std::vector<point_t<double, NUM_DIM>> neighbors_kdtree;
         std::vector<double> distances_kdtree;
-        kdtree.nearestNeighborsWithinRadius(test_point, SEARCH_RADIUS, neighbors_kdtree, distances_kdtree, true);
+        kdtree.findNeighborsWithinRadius(test_point, SEARCH_RADIUS, neighbors_kdtree, distances_kdtree, true);
 
         // Find neighbours within radius using brute force
         std::vector<point_t<double, NUM_DIM>> neighbours_brute_force;

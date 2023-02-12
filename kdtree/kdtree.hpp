@@ -1,8 +1,6 @@
 #ifndef KDTREE_HPP_
 #define KDTREE_HPP_
 
-#define THREADED 1
-
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -16,7 +14,7 @@
 #include <utility>
 #include <vector>
 
-static std::uint8_t DEFAULT_RECURSION_DEPTH =
+const static std::uint8_t DEFAULT_RECURSION_DEPTH =
     static_cast<std::uint8_t>(std::floor(std::log2(std::thread::hardware_concurrency())));
 
 template <typename T, std::size_t dim> using point_t = std::array<T, dim>;
@@ -105,8 +103,8 @@ template <typename T, std::size_t dim> class KDTree
         });
     }
 
-    void nearestNeighborsWithinRadius(const point_t &point, double search_radius, std::vector<point_t> &neighbors,
-                                      std::vector<double> &distances, bool return_sorted = true)
+    void findNeighborsWithinRadius(const point_t &point, double search_radius, std::vector<point_t> &neighbors,
+                                   std::vector<double> &distances, bool return_sorted = true)
     {
         if (root_ == nullptr)
         {
@@ -120,33 +118,43 @@ template <typename T, std::size_t dim> class KDTree
 
         if (return_sorted && !neighbors.empty())
         {
-            std::vector<std::size_t> indices;
-
-            indices.reserve(neighbors.size());
-            for (std::size_t i = 0; i < neighbors.size(); ++i)
-            {
-                indices.emplace_back(i);
-            }
-
-            std::sort(indices.begin(), indices.end(), [&distances](const std::size_t &idx_1, const std::size_t &idx_2) {
-                return (distances[idx_1] < distances[idx_2]);
-            });
-
-            std::vector<point_t> neighbours_temp;
-            neighbours_temp.reserve(neighbors.size());
-
-            std::vector<double> distances_temp;
-            distances_temp.reserve(distances.size());
-
-            for (const std::size_t &index : indices)
-            {
-                neighbours_temp.emplace_back(std::move(neighbors[index]));
-                distances_temp.emplace_back(std::move(distances[index]));
-            }
-
-            neighbors = std::move(neighbours_temp);
-            distances = std::move(distances_temp);
+            sortNeighborsByRadius(neighbors, distances);
         }
+    }
+
+    void findNeighborsWithinRadius(const std::vector<point_t> &points, double search_radius,
+                                   std::vector<std::vector<point_t>> &neighbors,
+                                   std::vector<std::vector<double>> &distances, bool return_sorted = true)
+    {
+        if (root_ == nullptr)
+        {
+            throw std::logic_error("Tree is empty");
+        }
+        else if (points.empty())
+        {
+            throw std::runtime_error("No points were provided");
+        }
+
+        const auto &number_of_points = points.size();
+
+        neighbors.clear();
+        distances.clear();
+
+        neighbors.resize(number_of_points);
+        distances.resize(number_of_points);
+
+        std::vector<std::size_t> indices;
+        indices.resize(number_of_points);
+        std::iota(indices.begin(), indices.end(), 0UL);
+
+        std::for_each(std::execution::par, indices.begin(), indices.end(), [&](const std::size_t &i) -> void {
+            recursiveNeighbourWithinRadiusSearch(root_, points[i], search_radius, 0UL, neighbors[i], distances[i]);
+
+            if (return_sorted && !neighbors.empty())
+            {
+                sortNeighborsByRadius(neighbors[i], distances[i]);
+            }
+        });
     }
 
     void printTree()
@@ -290,6 +298,40 @@ template <typename T, std::size_t dim> class KDTree
         }
 
         this->nearestSearch((delta > 0.0) ? root->right_ : root->left_, point, index, best, best_dist);
+    }
+
+    void sortNeighborsByRadius(std::vector<point_t> &neighbors, std::vector<double> &distances)
+    {
+        if (neighbors.empty())
+        {
+            return;
+        }
+
+        std::vector<std::size_t> indices;
+        indices.reserve(neighbors.size());
+        for (std::size_t i = 0; i < neighbors.size(); ++i)
+        {
+            indices.emplace_back(i);
+        }
+
+        std::sort(indices.begin(), indices.end(), [&distances](const std::size_t &idx_1, const std::size_t &idx_2) {
+            return (distances[idx_1] < distances[idx_2]);
+        });
+
+        std::vector<point_t> neighbours_temp;
+        neighbours_temp.reserve(neighbors.size());
+
+        std::vector<double> distances_temp;
+        distances_temp.reserve(distances.size());
+
+        for (const std::size_t &index : indices)
+        {
+            neighbours_temp.emplace_back(std::move(neighbors[index]));
+            distances_temp.emplace_back(std::move(distances[index]));
+        }
+
+        neighbors = std::move(neighbours_temp);
+        distances = std::move(distances_temp);
     }
 
     void recursiveNeighbourWithinRadiusSearch(Node *root, const point_t &point, double search_radius, std::size_t index,
